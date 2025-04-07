@@ -6,8 +6,9 @@ import numpy as np
 from tqdm import tqdm
 from torch.optim import Adam
 from data.load_data import ImageDataset
+from data.prepare_data import ImagePreprocessor
 from torch.utils.data import DataLoader
-from models.unet_base import Unet
+from model.unet import Unet
 from scheduler.linear_noise_scheduler import LinearNoiseScheduler
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -33,9 +34,12 @@ def train(args):
                                      beta_start=diffusion_config['beta_start'],
                                      beta_end=diffusion_config['beta_end'])
     
+    # Prepare images for traning
+    imageSet = ImagePreprocessor(dataset_config['src_path'],dataset_config['im_path'],'jpg',(480, 704))
+
     # Create the dataset
-    mnist = ImageDataset('train', im_path=dataset_config['im_path'])
-    mnist_loader = DataLoader(mnist, batch_size=train_config['batch_size'], shuffle=True, num_workers=4)
+    imageData = ImageDataset('train', im_path=dataset_config['im_path'])
+    imageDataLoader = DataLoader(imageData, batch_size=train_config['batch_size'], shuffle=True, num_workers=4)
     
     # Instantiate the model
     model = Unet(model_config).to(device)
@@ -58,7 +62,7 @@ def train(args):
     # Run training
     for epoch_idx in range(num_epochs):
         losses = []
-        for im in tqdm(mnist_loader):
+        for im in tqdm(imageDataLoader):
             optimizer.zero_grad()
             im = im.float().to(device)
             
@@ -80,8 +84,7 @@ def train(args):
             epoch_idx + 1,
             np.mean(losses),
         ))
-        torch.save(model.state_dict(), os.path.join(train_config['task_name'],
-                                                    train_config['ckpt_name']))
+        torch.save(model.state_dict(), os.path.join(train_config['task_name'], train_config['ckpt_name']))
     
     print('Done Training ...')
     
